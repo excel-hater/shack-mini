@@ -136,6 +136,21 @@ html, body {
 #settings .setting small { color: #aaa; }
 #settings .seed { color: #888; font-size: 12px; }
 #settings button { width: 100%; }
+#settings .manual-open { margin-top: 10px; background: #1d4ed8; border-color: #3b82f6; font-weight: bold; }
+#settings .dialog { max-height: 100%; overflow-y: auto; }
+#settings .manual { font-size: 13px; line-height: 1.55; }
+#settings .manual h3 { margin: 14px 0 4px; font-size: 14px; color: #ffd23f; }
+#settings .manual p { margin: 4px 0; }
+#settings .manual ul, #settings .manual ol { margin: 4px 0; padding-left: 20px; }
+#settings .manual .hint { color: #93c5fd; }
+#settings .manual .stairs { color: #d8b43a; font-weight: bold; }
+#settings .manual .legend { list-style: none; padding-left: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; }
+#settings .manual .legend li { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+#settings .manual .sw { flex: none; width: 18px; height: 18px; border-radius: 3px; }
+#settings .manual table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#settings .manual td { padding: 3px 4px; border-bottom: 1px solid #333; }
+#settings .manual td:nth-child(2) { color: #93c5fd; white-space: nowrap; }
+#settings .manual .buttons { display: flex; gap: 8px; margin-top: 12px; position: sticky; bottom: -16px; padding: 8px 0; background: #22262d; }
 #overlay .title { color: #ffd23f; font-weight: bold; }
 #overlay .big { font-size: 28px; font-weight: bold; }
 #overlay button { flex: none; min-width: 160px; }

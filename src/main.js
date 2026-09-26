@@ -6,6 +6,7 @@ import { actionButtons, createInput } from './view/input.js';
 import { renderHud, toggleLog } from './view/hud.js';
 import { createFx } from './view/fx.js';
 import { loadSettings, saveSettings, settingsHtml } from './view/settings.js';
+import { manualHtml } from './view/manual.js';
 
 function readSeed() {
   const v = Number(new URLSearchParams(location.search).get('seed'));
@@ -116,6 +117,16 @@ settingsEl.addEventListener('change', (e) => {
   refresh();
 });
 settingsEl.addEventListener('click', (e) => {
+  // 簡易マニュアルと設定の切り替え
+  if (e.target.closest('[data-action="openManual"]')) {
+    settingsEl.innerHTML = manualHtml();
+    settingsEl.querySelector('.dialog').scrollTop = 0;
+    return;
+  }
+  if (e.target.closest('[data-action="backToSettings"]')) {
+    openSettings();
+    return;
+  }
   // 外側（暗い部分）か「閉じる」で閉じる
   if (e.target === settingsEl || e.target.closest('[data-action="closeSettings"]')) {
     settingsEl.hidden = true;

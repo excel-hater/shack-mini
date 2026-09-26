@@ -41,6 +41,7 @@ export function settingsHtml(settings, seed) {
     <div class="dialog" role="dialog" aria-label="設定">
       <h2>設定</h2>
       ${rows}
+      <button type="button" class="manual-open" data-action="openManual">遊び方（簡易マニュアル）</button>
       <p class="seed">seed ${seed}（URLに <code>?seed=${seed}</code> を付けると同じマップで遊べる）</p>
       <button type="button" data-action="closeSettings">閉じる</button>
     </div>`;
