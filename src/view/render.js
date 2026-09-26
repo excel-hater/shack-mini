@@ -2,6 +2,7 @@
 
 import { CONFIG } from '../config.js';
 import { TILE } from '../logic/map.js';
+import { unitColor, unitMark } from './marks.js';
 
 const COLORS = {
   floorVisible: '#8f959c',
@@ -142,17 +143,6 @@ export function createRenderer(canvas) {
     }
   }
 
-  function unitColor(u) {
-    if (u.side === 'enemy') return u.kind === 'wanderer' ? '#9b4dff' : '#e04848';
-    if (u.kind === 'A' || u.kind === 'B') return '#3b7dff';
-    return '#2fb35a';
-  }
-
-  const MARKS = {
-    statue: '石', hound: '犬', warrior: '戦', healer: '癒',
-    goblin: 'ゴ', archer: '弓', wanderer: '徘',
-  };
-
   function drawUnits(state) {
     for (const u of state.units) {
       if (u.down) continue;
@@ -169,7 +159,7 @@ export function createRenderer(canvas) {
       ctx.font = `bold ${ts * 0.42}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(MARKS[u.kind] ?? u.kind, cx, cy + 1);
+      ctx.fillText(unitMark(u), cx, cy + 1);
       // HPバー
       const bw = ts - 6;
       const bx = u.x * ts + 3;

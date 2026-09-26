@@ -2,12 +2,13 @@
 
 import { CONFIG } from '../config.js';
 import { allActed, getUnit, heroes } from '../logic/game.js';
+import { guideText } from './guide.js';
 
 const $ = (id) => document.getElementById(id);
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-export function renderHud(state, buttons) {
+export function renderHud(state, buttons, settings, playing = null) {
   $('tb-floor').textContent = `${state.floor}階`;
   $('tb-turn').textContent = `ターン ${state.floorTurn}`;
   $('tb-best').textContent = `ベスト ${state.best}階`;
@@ -15,15 +16,24 @@ export function renderHud(state, buttons) {
   $('log').innerHTML = state.log.slice(-CONFIG.log.show).map((m) => `<div>${esc(m.text)}</div>`).join('');
   $('panel').innerHTML = panelHtml(state);
 
+  const g = guideText(state, settings, playing);
+  const guide = $('guide');
+  guide.hidden = !g;
+  if (g) {
+    guide.className = `tone-${g.tone}`;
+    guide.innerHTML = (g.who ? `<span class="badge" style="background:${g.who.color}">${esc(g.who.text)}</span>` : '')
+      + `<span class="text">${esc(g.text)}</span>`;
+  }
+
   $('actions').innerHTML = buttons
     .map((b) => `<button type="button" data-action="${b.action}"${b.arg ? ` data-arg="${b.arg}"` : ''}${b.disabled ? ' disabled' : ''}>${esc(b.label)}${b.sub ? `<small>${esc(b.sub)}</small>` : ''}</button>`)
     .join('');
 
-  const playing = state.phase === 'player';
+  const myTurn = state.phase === 'player' && !playing;
   const endBtn = document.querySelector('#controls [data-action="end"]');
-  endBtn.disabled = !playing;
-  endBtn.classList.toggle('hot', playing && allActed(state));
-  document.querySelector('#controls [data-action="next"]').disabled = !playing || allActed(state);
+  endBtn.disabled = !myTurn;
+  endBtn.classList.toggle('hot', myTurn && allActed(state));
+  document.querySelector('#controls [data-action="next"]').disabled = !myTurn || allActed(state);
 
   const overlay = $('overlay');
   if (state.phase === 'gameover') {

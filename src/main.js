@@ -53,7 +53,7 @@ function refresh() {
   }
   if (state.best > loadBest()) saveBest(state.best);
   renderer.draw(state);
-  renderHud(state, actionButtons(state));
+  renderHud(state, actionButtons(state), settings);
 }
 
 function restart() {

@@ -54,6 +54,41 @@ html, body {
   touch-action: none;
 }
 
+#guide {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 16px);
+  padding: 6px 14px 6px 6px;
+  border-radius: 999px;
+  background: rgba(20, 24, 32, 0.92);
+  border: 2px solid #3b7dff;
+  font-size: 15px;
+  font-weight: bold;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+#guide[hidden] { display: none; }
+#guide.tone-done { border-color: #c9a227; }
+#guide.tone-enemy { border-color: #e04848; }
+#guide .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 14px;
+}
+#guide .text { overflow: hidden; text-overflow: ellipsis; }
+#guide:not(:has(.badge)) { padding-left: 14px; }
+
 #overlay {
   position: absolute;
   inset: 0;
