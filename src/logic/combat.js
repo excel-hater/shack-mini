@@ -2,7 +2,7 @@
 
 import { CONFIG } from '../config.js';
 import { gainExp, isHero } from './units.js';
-import { addLog } from './log.js';
+import { addLog, pushEvent } from './log.js';
 
 // 必中・乱数なし・反撃なし
 export function calcDamage(attacker, target) {
@@ -12,7 +12,12 @@ export function calcDamage(attacker, target) {
 export function applyAttack(state, attacker, target) {
   const dmg = calcDamage(attacker, target);
   target.hp -= dmg;
-  addLog(state, `${attacker.name}の攻撃 → ${target.name}に${dmg}ダメージ`);
+  addLog(state, `${attacker.name}の攻撃 → ${target.name}に${dmg}ダメージ`, attacker.side);
+  pushEvent(state, {
+    type: 'attack', side: attacker.side, attackerId: attacker.id, targetId: target.id,
+    from: { x: attacker.x, y: attacker.y }, to: { x: target.x, y: target.y },
+    targetName: target.name, damage: dmg, defeated: target.hp <= 0,
+  });
   if (target.hp <= 0) {
     target.hp = 0;
     if (target.side === 'enemy') defeatEnemy(state, attacker, target);
@@ -31,21 +36,22 @@ function removeUnit(state, unit) {
 // 敵を倒した：倒したユニットにEXP（召喚ユニットが倒したら召喚者へ）。EXPを得たA・BはMP+1
 function defeatEnemy(state, attacker, enemy) {
   removeUnit(state, enemy);
-  addLog(state, `${enemy.name}を倒した`);
+  addLog(state, `${enemy.name}を倒した`, 'ally');
   const earner = attacker.summonerId != null
     ? state.units.find((u) => u.id === attacker.summonerId)
     : attacker;
   if (!earner || !isHero(earner) || earner.down) return;
   const ups = gainExp(earner, enemy.expReward);
   earner.mp = Math.min(earner.maxMp, earner.mp + CONFIG.mp.onKill);
-  addLog(state, `${earner.name}は${enemy.expReward}EXPを得た${ups ? `。Lv${earner.lv}に上がった！` : ''}`);
+  addLog(state, `${earner.name}は${enemy.expReward}EXPを得た${ups ? `。Lv${earner.lv}に上がった！` : ''}`, 'ally');
+  if (ups) pushEvent(state, { type: 'levelup', unitId: earner.id, at: { x: earner.x, y: earner.y }, lv: earner.lv });
 }
 
 // 味方が倒された。A・Bなら退場（召喚ユニットも消える）、召喚ユニットなら消えるだけ
 export function knockOut(state, unit) {
   if (!isHero(unit)) {
     removeUnit(state, unit);
-    addLog(state, `${unit.name}が消えた`);
+    addLog(state, `${unit.name}が消えた`, 'enemy');
     return;
   }
   unit.hp = 0;
@@ -53,7 +59,8 @@ export function knockOut(state, unit) {
   unit.moved = unit.acted = true;
   if (state.selectedId === unit.id) state.selectedId = null;
   for (const s of state.units.filter((u) => u.summonerId === unit.id)) removeUnit(state, s);
-  addLog(state, `${unit.name}が倒れた（次の階層で復活）`);
+  addLog(state, `${unit.name}が倒れた（次の階層で復活）`, 'enemy');
+  pushEvent(state, { type: 'down', unitId: unit.id, at: { x: unit.x, y: unit.y }, name: unit.name });
   const heroes = state.units.filter(isHero);
   if (heroes.every((h) => h.down)) {
     state.phase = 'gameover';

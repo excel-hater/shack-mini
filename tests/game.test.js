@@ -4,7 +4,7 @@ import { CONFIG } from '../src/config.js';
 import { chooseTarget, runEnemyPhase } from '../src/logic/ai.js';
 import {
   attack, canDescend, canSummon, descend, endPlayerPhase, getAttackTargets, getHealTargets,
-  getSummonTiles, heal, heroes, moveUnit, newGame, summon,
+  getSummonTiles, getThreatTiles, heal, heroes, moveUnit, newGame, setOptions, summon,
 } from '../src/logic/game.js';
 import { knockOut } from '../src/logic/combat.js';
 import { computeVisibility } from '../src/logic/vision.js';
@@ -284,7 +284,7 @@ test('40ターン目に徘徊者が出て、経路距離が近い方のA・Bを�
   const wd = s.units.find((u) => u.kind === 'wanderer');
   assert.ok(wd, '徘徊者が出る');
   assert.equal(s.wandererSpawned, true);
-  assert.ok(s.log.includes('何かの気配がする…'));
+  assert.ok(s.log.some((l) => l.text === '何かの気配がする…' && l.side === 'enemy'));
   const [A, B] = heroes(s);
   const dA = distanceField(s.map, wd)[A.y * s.map.w + A.x];
   const dB = distanceField(s.map, wd)[B.y * s.map.w + B.x];
@@ -334,4 +334,75 @@ test('弓ゴブリンは3階から出る。敵Lvは階層に沿って上がる',
     for (const e of s.units.filter((u) => u.side === 'enemy')) assert.equal(e.lv, CONFIG.enemyLevel(s.floor));
   }
   assert.ok(archers > 0, '3階では弓ゴブリンが混ざる');
+});
+
+test('敵の攻撃はログで side=enemy、味方の攻撃は side=ally になり、attack イベントが出る', () => {
+  const s = stateFrom(OPEN, OPEN_ROOM);
+  const a = addHero(s, 'A', 1, 1);
+  addHero(s, 'B', 10, 4);
+  const g = addEnemy(s, 'goblin', 2, 1);
+  computeVisibility(s);
+  attack(s, a.id, g.id);
+  assert.equal(s.log.at(-1).side, 'ally');
+  const ev = s.events.find((e) => e.type === 'attack');
+  assert.deepEqual(
+    { side: ev.side, from: ev.from, to: ev.to, damage: ev.damage, targetId: ev.targetId },
+    { side: 'ally', from: { x: 1, y: 1 }, to: { x: 2, y: 1 }, damage: a.atk - g.def, targetId: g.id },
+  );
+  s.events.length = 0;
+  endPlayerPhase(s);
+  const enemyLogs = s.log.filter((l) => l.text.startsWith('ゴブリンの攻撃'));
+  assert.equal(enemyLogs.length, 1);
+  assert.equal(enemyLogs[0].side, 'enemy');
+  assert.deepEqual(s.events.map((e) => e.type), ['enemyPhase', 'attack', 'playerPhase']);
+  assert.equal(s.events[1].side, 'enemy');
+  assert.equal(s.events[1].targetId, a.id);
+});
+
+test('階層開始で floor イベント、撃破でA・Bが倒れたら down イベント', () => {
+  const s = newGame(8);
+  assert.deepEqual(s.events.map((e) => e.type), ['floor']);
+  assert.equal(s.events[0].floor, 1);
+  const s2 = stateFrom(OPEN, OPEN_ROOM);
+  const a = addHero(s2, 'A', 1, 1, { hp: 1 });
+  addHero(s2, 'B', 10, 4);
+  addEnemy(s2, 'goblin', 2, 1);
+  endPlayerPhase(s2);
+  assert.ok(a.down);
+  assert.ok(s2.events.some((e) => e.type === 'down' && e.unitId === a.id));
+});
+
+test('石像の自動行動済み：ONなら毎ターン最初から行動済み、OFFなら選べる', () => {
+  const s = newGame(12);
+  s.units = s.units.filter((u) => u.side !== 'enemy');
+  const [A] = heroes(s);
+  A.mp = 99;
+  const t = getSummonTiles(s, A.id)[0];
+  summon(s, A.id, 'statue', t.x, t.y);
+  const st = s.units.find((u) => u.kind === 'statue');
+  endPlayerPhase(s);
+  assert.equal(st.acted, true, 'ON（既定）');
+  assert.notEqual(s.selectedId, st.id);
+  setOptions(s, { autoSkipStatue: false });
+  endPlayerPhase(s);
+  assert.equal(st.acted, false, 'OFF');
+  setOptions(s, { autoSkipStatue: true });
+  assert.equal(st.acted, true, 'ONに戻すとすぐ効く');
+});
+
+test('敵の行動範囲：移動範囲は壁と味方を越えず、攻撃範囲は移動範囲の外側', () => {
+  const s = stateFrom([
+    '#########',
+    '#...#...#',
+    '#...#...#',
+    '#########',
+  ]);
+  addHero(s, 'A', 7, 1);
+  addHero(s, 'B', 1, 2);
+  const g = addEnemy(s, 'goblin', 1, 1);
+  const { move, attack: atk } = getThreatTiles(s, g.id);
+  assert.ok(move.every((p) => p.x <= 3), '壁の向こうへは行けない');
+  assert.ok(!move.some((p) => p.x === 1 && p.y === 2), '味方のマスは移動範囲に入らない');
+  assert.ok(atk.some((p) => p.x === 1 && p.y === 2), '隣の味方には攻撃が届く');
+  assert.ok(!atk.some((p) => move.some((m) => m.x === p.x && m.y === p.y)));
 });

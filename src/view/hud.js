@@ -13,7 +13,7 @@ export function renderHud(state, buttons) {
   $('tb-best').textContent = `ベスト ${state.best}階`;
   $('tb-seed').textContent = `seed ${state.seed}`;
 
-  $('log').innerHTML = state.log.slice(-CONFIG.log.show).map((m) => `<div>${esc(m)}</div>`).join('');
+  $('log').innerHTML = state.log.slice(-CONFIG.log.show).map((m) => `<div>${esc(m.text)}</div>`).join('');
   $('panel').innerHTML = panelHtml(state);
 
   $('actions').innerHTML = buttons

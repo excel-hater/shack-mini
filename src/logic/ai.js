@@ -4,9 +4,11 @@ import { CONFIG } from '../config.js';
 import { idx, roomIdAt } from './map.js';
 import { computeReachable, distanceField, inRange } from './path.js';
 import { applyAttack } from './combat.js';
+import { pushEvent } from './log.js';
 import { isHero } from './units.js';
 
 export function runEnemyPhase(state) {
+  pushEvent(state, { type: 'enemyPhase' });
   for (const e of [...state.units]) {
     if (state.phase === 'gameover') return;
     if (e.side !== 'enemy' || !state.units.includes(e)) continue;

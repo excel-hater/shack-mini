@@ -9,7 +9,10 @@ import { createEnemy, createHero, createSummon, isHero } from './units.js';
 import { computeVisibility } from './vision.js';
 import { calcDamage, applyAttack } from './combat.js';
 import { runEnemyPhase } from './ai.js';
-import { addLog } from './log.js';
+import { addLog, pushEvent } from './log.js';
+
+// logic が必要とする設定。autoSkipStatue：石像（何もできない）を最初から行動済みにする
+export const DEFAULT_OPTIONS = { autoSkipStatue: true };
 
 export function newGame(seed, opts = {}) {
   const state = {
@@ -27,6 +30,8 @@ export function newGame(seed, opts = {}) {
     selectedId: null,
     ui: emptyUi(),
     log: [],
+    events: [],
+    options: { ...DEFAULT_OPTIONS, ...opts.options },
     wandererSpawned: false,
   };
   state.units.push(createHero(state.nextId++, 'A', 0, 0));
@@ -97,6 +102,7 @@ function setupFloor(state) {
 
   state.floorTurn = 1;
   state.wandererSpawned = false;
+  pushEvent(state, { type: 'floor', floor: state.floor });
   startPlayerPhase(state);
 }
 
@@ -141,6 +147,7 @@ function startPlayerPhase(state) {
     u.acted = false;
     u.moveFrom = null;
   }
+  if (state.options?.autoSkipStatue) skipStatues(state);
   computeVisibility(state);
   state.selectedId = null;
   state.ui = emptyUi();
@@ -165,8 +172,25 @@ export function endPlayerPhase(state) {
       if (!h.down) h.hp = Math.min(h.maxHp, h.hp + Math.ceil(h.maxHp * CONFIG.regen.ratio));
     }
   }
+  pushEvent(state, { type: 'playerPhase', turn: state.floorTurn });
   startPlayerPhase(state);
   return true;
+}
+
+function skipStatues(state) {
+  for (const u of state.units) {
+    if (u.kind === 'statue') u.moved = u.acted = true;
+  }
+}
+
+// 設定の変更を反映する。石像の自動行動済みをONにしたら、今のターンからすぐ効かせる
+export function setOptions(state, opts) {
+  state.options = { ...state.options, ...opts };
+  if (state.options.autoSkipStatue && state.phase === 'player') {
+    skipStatues(state);
+    const sel = getUnit(state, state.selectedId);
+    if (sel?.kind === 'statue') afterAction(state);
+  }
 }
 
 // 見えているマスを1つも含まない部屋
@@ -184,7 +208,7 @@ function spawnReinforcements(state) {
       const room = rng.pick(rooms);
       const n = rng.int(sp.reinforceCount[0], sp.reinforceCount[1]);
       for (let k = 0; k < n; k++) spawnEnemy(state, room, randomEnemyKind(state));
-      addLog(state, 'どこかで敵の増援が現れた');
+      addLog(state, 'どこかで敵の増援が現れた', 'enemy');
     }
   }
   // TODO(仕様): 見えていない部屋がないときは、次のターン以降に持ち越す
@@ -192,7 +216,7 @@ function spawnReinforcements(state) {
     const rooms = hiddenRooms(state);
     if (rooms.length && spawnEnemy(state, rng.pick(rooms), 'wanderer')) {
       state.wandererSpawned = true;
-      addLog(state, '何かの気配がする…');
+      addLog(state, '何かの気配がする…', 'enemy');
     }
   }
 }
@@ -389,7 +413,7 @@ export function summon(state, id, kind, x, y) {
   const u = getUnit(state, id);
   u.mp -= CONFIG.summons[kind].mp;
   state.units.push(createSummon(state.nextId++, kind, u, x, y));
-  addLog(state, `${u.name}は${CONFIG.summons[kind].name}を召喚した`);
+  addLog(state, `${u.name}は${CONFIG.summons[kind].name}を召喚した`, 'ally');
   u.moved = true;
   u.acted = true;
   afterAction(state);
@@ -412,9 +436,34 @@ export function heal(state, id, targetId) {
   const t = getUnit(state, targetId);
   const before = t.hp;
   t.hp = Math.min(t.maxHp, t.hp + u.heal);
-  addLog(state, `${u.name}が${t.name}のHPを${t.hp - before}回復した`);
+  addLog(state, `${u.name}が${t.name}のHPを${t.hp - before}回復した`, 'ally');
+  pushEvent(state, { type: 'heal', side: 'ally', from: { x: u.x, y: u.y }, to: { x: t.x, y: t.y }, amount: t.hp - before });
   u.moved = true;
   u.acted = true;
   afterAction(state);
   return true;
+}
+
+// ---------- 敵の行動範囲（調査用） ----------
+
+// 敵が次の敵フェイズで移動できるマス（move）と、そこから攻撃が届くマス（attack）
+export function getThreatTiles(state, enemyId) {
+  const e = getUnit(state, enemyId);
+  if (!e || e.side !== 'enemy') return { move: [], attack: [] };
+  const map = state.map;
+  const move = computeReachable(map, e, state.units);
+  const moveSet = new Set(move.map((p) => idx(map, p.x, p.y)));
+  const attackSet = new Set();
+  for (const p of move) {
+    for (let y = p.y - e.rangeMax; y <= p.y + e.rangeMax; y++) {
+      for (let x = p.x - e.rangeMax; x <= p.x + e.rangeMax; x++) {
+        if (x < 0 || y < 0 || x >= map.w || y >= map.h) continue;
+        const i = idx(map, x, y);
+        if (map.tiles[i] === TILE.WALL || moveSet.has(i)) continue;
+        if (inRange(p, { x, y }, e.rangeMin, e.rangeMax)) attackSet.add(i);
+      }
+    }
+  }
+  const toXY = (i) => ({ x: i % map.w, y: Math.floor(i / map.w) });
+  return { move: move.map(({ x, y }) => ({ x, y })), attack: [...attackSet].map(toXY) };
 }
