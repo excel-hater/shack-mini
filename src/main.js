@@ -1,9 +1,10 @@
 import { CONFIG } from './config.js';
 import { randomSeed } from './logic/rng.js';
-import { getUnit, newGame } from './logic/game.js';
+import { getUnit, newGame, setOptions } from './logic/game.js';
 import { createRenderer } from './view/render.js';
 import { actionButtons, createInput } from './view/input.js';
 import { renderHud } from './view/hud.js';
+import { loadSettings, saveSettings, settingsHtml } from './view/settings.js';
 
 function readSeed() {
   const v = Number(new URLSearchParams(location.search).get('seed'));
@@ -30,11 +31,13 @@ function saveBest(best) {
 const canvas = document.getElementById('map');
 const renderer = createRenderer(canvas);
 let state = null;
+const settings = loadSettings();
+const logicOptions = () => ({ autoSkipStatue: settings.autoSkipStatue });
 let lastSelectedId = null;
 let lastMap = null;
 
 function start(seed) {
-  state = newGame(seed, { best: loadBest() });
+  state = newGame(seed, { best: loadBest(), options: logicOptions() });
   lastSelectedId = null;
   lastMap = null;
   renderer.view.overview = false;
@@ -66,7 +69,30 @@ function restart() {
   refresh();
 }
 
-const input = createInput({ canvas, renderer, getState: () => state, refresh, restart });
+const input = createInput({ canvas, renderer, getState: () => state, getSettings: () => settings, refresh, restart });
+
+// 設定ダイアログ
+const settingsEl = document.getElementById('settings');
+function openSettings() {
+  settingsEl.innerHTML = settingsHtml(settings, state.seed);
+  settingsEl.hidden = false;
+}
+settingsEl.addEventListener('change', (e) => {
+  const key = e.target.dataset?.setting;
+  if (!key) return;
+  settings[key] = e.target.checked;
+  saveSettings(settings);
+  setOptions(state, logicOptions());
+  refresh();
+});
+settingsEl.addEventListener('click', (e) => {
+  // 外側（暗い部分）か「閉じる」で閉じる
+  if (e.target === settingsEl || e.target.closest('[data-action="closeSettings"]')) {
+    settingsEl.hidden = true;
+    refresh();
+  }
+});
+document.getElementById('tb-settings').addEventListener('click', openSettings);
 
 for (const el of [document.getElementById('actions'), document.getElementById('controls'), document.getElementById('overlay')]) {
   el.addEventListener('click', (e) => {

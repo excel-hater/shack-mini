@@ -11,7 +11,6 @@ export function renderHud(state, buttons) {
   $('tb-floor').textContent = `${state.floor}階`;
   $('tb-turn').textContent = `ターン ${state.floorTurn}`;
   $('tb-best').textContent = `ベスト ${state.best}階`;
-  $('tb-seed').textContent = `seed ${state.seed}`;
 
   $('log').innerHTML = state.log.slice(-CONFIG.log.show).map((m) => `<div>${esc(m.text)}</div>`).join('');
   $('panel').innerHTML = panelHtml(state);

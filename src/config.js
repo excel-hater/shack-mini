@@ -42,4 +42,5 @@ export const CONFIG = {
   tileSize: 32,
   dragThreshold: 8,
   storageKey: 'shack-mini.best',
+  settingsKey: 'shack-mini.settings',
 };
