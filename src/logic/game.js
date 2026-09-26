@@ -4,9 +4,11 @@
 import { CONFIG } from '../config.js';
 import { createRng } from './rng.js';
 import { generateMap, idx, roomCenter, roomTiles, TILE } from './map.js';
-import { computeReachable, manhattan, occupancy } from './path.js';
-import { createHero, isHero } from './units.js';
+import { computeReachable, inRange, manhattan, occupancy } from './path.js';
+import { createEnemy, createHero, isHero } from './units.js';
 import { computeVisibility } from './vision.js';
+import { calcDamage, applyAttack } from './combat.js';
+import { runEnemyPhase } from './ai.js';
 import { addLog } from './log.js';
 
 export function newGame(seed, opts = {}) {
@@ -89,6 +91,10 @@ function setupFloor(state) {
   map.tiles[idx(map, stairs.x, stairs.y)] = TILE.STAIRS;
   map.stairs = stairs;
 
+  // 敵：A・Bの部屋以外の部屋に置く
+  const count = CONFIG.spawn.base + Math.floor(state.floor / CONFIG.spawn.perFloors);
+  for (let k = 0; k < count; k++) spawnEnemy(state, rng.pick(others), 'goblin');
+
   state.floorTurn = 1;
   state.wandererSpawned = false;
   startPlayerPhase(state);
@@ -112,6 +118,14 @@ function placeInRoom(state, unit, room) {
   unit.y = t.y;
 }
 
+function spawnEnemy(state, room, kind) {
+  const t = emptyTileInRoom(state, room, { avoidStairs: true });
+  if (!t) return null;
+  const e = createEnemy(state.nextId++, kind, CONFIG.enemyLevel(state.floor), t.x, t.y);
+  state.units.push(e);
+  return e;
+}
+
 // ---------- フェイズ ----------
 
 function startPlayerPhase(state) {
@@ -132,7 +146,18 @@ export function endPlayerPhase(state) {
   if (state.phase !== 'player') return false;
   state.phase = 'enemy';
   state.ui = emptyUi();
+  runEnemyPhase(state);
+  if (state.phase === 'gameover') {
+    state.selectedId = null;
+    computeVisibility(state);
+    return true;
+  }
   state.floorTurn++;
+  if (state.floorTurn % CONFIG.regen.everyTurns === 0) {
+    for (const h of heroes(state)) {
+      if (!h.down) h.hp = Math.min(h.maxHp, h.hp + Math.ceil(h.maxHp * CONFIG.regen.ratio));
+    }
+  }
   startPlayerPhase(state);
   return true;
 }
@@ -226,6 +251,32 @@ export function cancelMove(state, id) {
 export function wait(state, id) {
   const u = isOwnActive(state, id);
   if (!u || u.acted) return false;
+  u.moved = true;
+  u.acted = true;
+  afterAction(state);
+  return true;
+}
+
+// ---------- 攻撃 ----------
+
+// 攻撃できる敵（見えていて射程内）。予測ダメージつき
+export function getAttackTargets(state, id) {
+  const u = isOwnActive(state, id);
+  if (!u || u.acted || !u.canAttack) return [];
+  return state.units
+    .filter((e) => e.side === 'enemy' && state.visible[idx(state.map, e.x, e.y)]
+      && inRange(u, e, u.rangeMin, u.rangeMax))
+    .map((e) => {
+      const damage = calcDamage(u, e);
+      return { x: e.x, y: e.y, id: e.id, damage, lethal: damage >= e.hp };
+    });
+}
+
+export function attack(state, id, targetId) {
+  const u = isOwnActive(state, id);
+  if (!u || u.acted) return false;
+  if (!getAttackTargets(state, id).some((t) => t.id === targetId)) return false;
+  applyAttack(state, u, getUnit(state, targetId));
   u.moved = true;
   u.acted = true;
   afterAction(state);

@@ -50,6 +50,15 @@ export function createInput({ canvas, renderer, getState, refresh, restart }) {
     const ui = state.ui;
     const sel = G.getUnit(state, state.selectedId);
 
+    // 攻撃・召喚・回復の対象選び。対象以外をタップしたら取り消し
+    if (ui.mode === 'attack' || ui.mode === 'summon' || ui.mode === 'heal') {
+      const t = has(ui.targets, p.x, p.y);
+      if (t && ui.mode === 'attack') G.attack(state, sel.id, t.id);
+      else G.selectUnit(state, sel.id);
+      refresh();
+      return;
+    }
+
     if (ui.mode === 'move' && sel) {
       if (sel.x === p.x && sel.y === p.y) {
         // 自分のマス → 移動せずに行動へ
@@ -94,6 +103,9 @@ export function createInput({ canvas, renderer, getState, refresh, restart }) {
       case 'end':
         G.endPlayerPhase(state);
         break;
+      case 'attack':
+        state.ui = { ...state.ui, mode: 'attack', reachable: null, targets: G.getAttackTargets(state, id) };
+        break;
       case 'wait':
         G.wait(state, id);
         break;
@@ -120,6 +132,7 @@ export function actionButtons(state) {
     return [{ action: 'cancel', label: 'やめる' }];
   }
   const list = [];
+  if (u.canAttack && G.getAttackTargets(state, u.id).length) list.push({ action: 'attack', label: '攻撃' });
   list.push({ action: 'wait', label: '待機' });
   if (u.moved) list.push({ action: 'undo', label: '戻す' });
   return list;
