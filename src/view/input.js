@@ -54,6 +54,8 @@ export function createInput({ canvas, renderer, getState, refresh, restart }) {
     if (ui.mode === 'attack' || ui.mode === 'summon' || ui.mode === 'heal') {
       const t = has(ui.targets, p.x, p.y);
       if (t && ui.mode === 'attack') G.attack(state, sel.id, t.id);
+      else if (t && ui.mode === 'summon') G.summon(state, sel.id, ui.summonKind, t.x, t.y);
+      else if (t && ui.mode === 'heal') G.heal(state, sel.id, t.id);
       else G.selectUnit(state, sel.id);
       refresh();
       return;
@@ -106,6 +108,16 @@ export function createInput({ canvas, renderer, getState, refresh, restart }) {
       case 'attack':
         state.ui = { ...state.ui, mode: 'attack', reachable: null, targets: G.getAttackTargets(state, id) };
         break;
+      case 'summonMenu':
+        state.ui = { ...state.ui, mode: 'summonPick', reachable: null, targets: null };
+        break;
+      case 'summonKind':
+        if (!G.canSummon(state, id, arg)) break;
+        state.ui = { ...state.ui, mode: 'summon', summonKind: arg, targets: G.getSummonTiles(state, id) };
+        break;
+      case 'heal':
+        state.ui = { ...state.ui, mode: 'heal', reachable: null, targets: G.getHealTargets(state, id) };
+        break;
       case 'descend':
         G.descend(state, id);
         break;
@@ -131,11 +143,24 @@ export function actionButtons(state) {
   const u = G.getUnit(state, state.selectedId);
   if (!u || u.down || u.side !== 'ally' || u.acted) return [];
   const ui = state.ui;
+  if (ui.mode === 'summonPick') {
+    const tiles = G.getSummonTiles(state, u.id).length > 0;
+    return [
+      ...G.SUMMON_KINDS.map((k) => ({
+        action: 'summonKind', arg: k,
+        label: CONFIG.summons[k].name, sub: `MP${CONFIG.summons[k].mp}`,
+        disabled: !tiles || !G.canSummon(state, u.id, k),
+      })),
+      { action: 'cancel', label: 'やめる' },
+    ];
+  }
   if (ui.mode !== 'move' && ui.mode !== 'action') {
     return [{ action: 'cancel', label: 'やめる' }];
   }
   const list = [];
   if (u.canAttack && G.getAttackTargets(state, u.id).length) list.push({ action: 'attack', label: '攻撃' });
+  if (u.kind === 'A' || u.kind === 'B') list.push({ action: 'summonMenu', label: '召喚' });
+  if (G.getHealTargets(state, u.id).length) list.push({ action: 'heal', label: '回復' });
   if (G.canDescend(state, u.id)) list.push({ action: 'descend', label: '降りる' });
   list.push({ action: 'wait', label: '待機' });
   if (u.moved) list.push({ action: 'undo', label: '戻す' });

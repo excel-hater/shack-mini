@@ -5,7 +5,7 @@ import { CONFIG } from '../config.js';
 import { createRng } from './rng.js';
 import { generateMap, idx, roomCenter, roomTiles, TILE } from './map.js';
 import { computeReachable, inRange, manhattan, occupancy } from './path.js';
-import { createEnemy, createHero, isHero } from './units.js';
+import { createEnemy, createHero, createSummon, isHero } from './units.js';
 import { computeVisibility } from './vision.js';
 import { calcDamage, applyAttack } from './combat.js';
 import { runEnemyPhase } from './ai.js';
@@ -309,5 +309,77 @@ export function descend(state, id) {
   // 召喚ユニットと敵は消える
   state.units = heroes(state);
   setupFloor(state);
+  return true;
+}
+
+// ---------- 召喚・回復 ----------
+
+export const SUMMON_KINDS = Object.keys(CONFIG.summons);
+
+export function summonsOf(state, summonerId) {
+  return state.units.filter((u) => u.summonerId === summonerId);
+}
+
+export function canSummon(state, id, kind) {
+  const u = isOwnActive(state, id);
+  const def = CONFIG.summons[kind];
+  if (!u || u.acted || !isHero(u) || !def) return false;
+  return u.mp >= def.mp && summonsOf(state, id).length < CONFIG.summon.maxPerSummoner;
+}
+
+// 召喚者からマンハッタン距離 placeRange 以内の空いている床
+export function getSummonTiles(state, id) {
+  const u = isOwnActive(state, id);
+  if (!u || u.acted || !isHero(u)) return [];
+  const map = state.map;
+  const occ = occupancy(map, state.units);
+  const r = CONFIG.summon.placeRange;
+  const out = [];
+  for (let y = u.y - r; y <= u.y + r; y++) {
+    for (let x = u.x - r; x <= u.x + r; x++) {
+      if (x < 0 || y < 0 || x >= map.w || y >= map.h) continue;
+      if (manhattan(u, { x, y }) > r) continue;
+      const i = idx(map, x, y);
+      // TODO(仕様): 階段マスに召喚すると A・B が降りられなくなるので、階段には置けないことにした
+      if (map.tiles[i] !== TILE.FLOOR || occ[i]) continue;
+      out.push({ x, y });
+    }
+  }
+  return out;
+}
+
+export function summon(state, id, kind, x, y) {
+  if (!canSummon(state, id, kind)) return false;
+  if (!getSummonTiles(state, id).some((p) => p.x === x && p.y === y)) return false;
+  const u = getUnit(state, id);
+  u.mp -= CONFIG.summons[kind].mp;
+  state.units.push(createSummon(state.nextId++, kind, u, x, y));
+  addLog(state, `${u.name}は${CONFIG.summons[kind].name}を召喚した`);
+  u.moved = true;
+  u.acted = true;
+  afterAction(state);
+  return true;
+}
+
+// 癒し手の回復対象：隣接する、HPが減っている味方（自分は対象外）
+export function getHealTargets(state, id) {
+  const u = isOwnActive(state, id);
+  if (!u || u.acted || !u.heal) return [];
+  return state.units
+    .filter((a) => a.side === 'ally' && !a.down && a !== u && a.hp < a.maxHp
+      && manhattan(u, a) <= CONFIG.healRange)
+    .map((a) => ({ x: a.x, y: a.y, id: a.id }));
+}
+
+export function heal(state, id, targetId) {
+  if (!getHealTargets(state, id).some((t) => t.id === targetId)) return false;
+  const u = getUnit(state, id);
+  const t = getUnit(state, targetId);
+  const before = t.hp;
+  t.hp = Math.min(t.maxHp, t.hp + u.heal);
+  addLog(state, `${u.name}が${t.name}のHPを${t.hp - before}回復した`);
+  u.moved = true;
+  u.acted = true;
+  afterAction(state);
   return true;
 }

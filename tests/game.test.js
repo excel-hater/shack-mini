@@ -2,9 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CONFIG } from '../src/config.js';
 import { chooseTarget, runEnemyPhase } from '../src/logic/ai.js';
-import { attack, canDescend, descend, endPlayerPhase, getAttackTargets, heroes, newGame } from '../src/logic/game.js';
+import {
+  attack, canDescend, canSummon, descend, endPlayerPhase, getAttackTargets, getHealTargets,
+  getSummonTiles, heal, heroes, moveUnit, newGame, summon,
+} from '../src/logic/game.js';
+import { knockOut } from '../src/logic/combat.js';
 import { computeVisibility } from '../src/logic/vision.js';
-import { addEnemy, addHero, stateFrom } from './helpers.js';
+import { addEnemy, addHero, addSummon, stateFrom } from './helpers.js';
 
 const OPEN = [
   '############',
@@ -156,4 +160,85 @@ test('階段の上にいないと降りられない', () => {
   assert.equal(canDescend(s, A.id), false);
   assert.equal(descend(s, A.id), false);
   assert.equal(s.floor, 1);
+});
+
+test('召喚：MP不足・上限2体のときは召喚できない', () => {
+  const s = stateFrom(OPEN, OPEN_ROOM);
+  const b = addHero(s, 'B', 5, 2);
+  addHero(s, 'A', 1, 1);
+  b.mp = CONFIG.summons.warrior.mp - 1;
+  assert.equal(canSummon(s, b.id, 'warrior'), false);
+  assert.equal(summon(s, b.id, 'warrior', 5, 3), false);
+  b.mp = 99;
+  assert.equal(canSummon(s, b.id, 'warrior'), true);
+  addSummon(s, 'hound', b, 4, 2);
+  addSummon(s, 'hound', b, 6, 2);
+  assert.equal(canSummon(s, b.id, 'warrior'), false, '上限2体');
+});
+
+test('召喚：距離2以内の空いている床に出せて、出したターンは動かせない', () => {
+  const s = stateFrom(OPEN, OPEN_ROOM);
+  const b = addHero(s, 'B', 5, 2);
+  addHero(s, 'A', 1, 1);
+  computeVisibility(s);
+  const tiles = getSummonTiles(s, b.id);
+  assert.ok(tiles.every((p) => Math.abs(p.x - 5) + Math.abs(p.y - 2) <= CONFIG.summon.placeRange));
+  assert.equal(summon(s, b.id, 'hound', 9, 2), false, '遠すぎる');
+  const mp = b.mp;
+  assert.equal(summon(s, b.id, 'hound', 6, 3), true);
+  assert.equal(b.mp, mp - CONFIG.summons.hound.mp);
+  assert.equal(b.acted, true);
+  const h = s.units.find((u) => u.kind === 'hound');
+  assert.equal(h.summonerId, b.id);
+  assert.equal(moveUnit(s, h.id, 6, 4), false, '出したターンは動かせない');
+  assert.equal(h.hp, CONFIG.summons.hound.make(b.lv).hp);
+});
+
+test('召喚ユニットは召喚者の退場と階段で消える', () => {
+  const s = newGame(11);
+  s.units = s.units.filter((u) => u.side !== 'enemy');
+  const [A, B] = heroes(s);
+  A.mp = 99;
+  B.mp = 99;
+  const ta = getSummonTiles(s, A.id)[0];
+  summon(s, A.id, 'statue', ta.x, ta.y);
+  const tb = getSummonTiles(s, B.id)[0];
+  summon(s, B.id, 'warrior', tb.x, tb.y);
+  assert.equal(s.units.length, 4);
+  knockOut(s, B);
+  assert.equal(s.units.filter((u) => u.summonerId === B.id).length, 0, '召喚者の退場で消える');
+  assert.equal(s.units.filter((u) => u.summonerId === A.id).length, 1);
+  endPlayerPhase(s);
+  A.x = s.map.stairs.x;
+  A.y = s.map.stairs.y;
+  descend(s, A.id);
+  assert.equal(s.units.filter((u) => u.summonerId != null).length, 0, '階段で消える');
+});
+
+test('猟犬を先の部屋に入れると、その部屋が見える', () => {
+  const s = stateFrom([
+    '##############',
+    '#...#....#...#',
+    '#...........>#',
+    '#...#....#...#',
+    '##############',
+  ], [{ x: 1, y: 1, w: 3, h: 3 }, { x: 10, y: 1, w: 3, h: 3 }]);
+  const b = addHero(s, 'B', 1, 2);
+  addHero(s, 'A', 1, 1);
+  computeVisibility(s);
+  assert.equal(s.visible[2 * s.map.w + 12], 0, '最初は奥の部屋が見えない');
+  addSummon(s, 'hound', b, 10, 1);
+  computeVisibility(s);
+  assert.equal(s.visible[2 * s.map.w + 12], 1, '猟犬の視界で見える');
+  assert.equal(s.seen[2 * s.map.w + 12], 1);
+});
+
+test('癒し手は隣接する味方を回復できる（自分は対象外）', () => {
+  const s = stateFrom(OPEN, OPEN_ROOM);
+  const a = addHero(s, 'A', 3, 2, { hp: 5 });
+  addHero(s, 'B', 9, 4);
+  const h = addSummon(s, 'healer', a, 4, 2, { moved: false, acted: false, hp: 1 });
+  assert.deepEqual(getHealTargets(s, h.id).map((t) => t.id), [a.id]);
+  assert.equal(heal(s, h.id, a.id), true);
+  assert.equal(a.hp, 5 + h.heal);
 });
