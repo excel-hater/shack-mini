@@ -1,0 +1,109 @@
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  color: #eee;
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font-size: 14px;
+  -webkit-text-size-adjust: 100%;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  max-width: 720px;
+  margin: 0 auto;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+#topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 6px 10px;
+  background: #1c1f24;
+  font-size: 13px;
+}
+#tb-seed { margin-left: auto; color: #888; }
+
+#map-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #000;
+}
+#map {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  text-align: center;
+}
+#overlay[hidden] { display: none; }
+#overlay .big { font-size: 28px; font-weight: bold; }
+#overlay button { flex: none; min-width: 160px; }
+
+#log {
+  padding: 4px 10px;
+  background: #16181c;
+  font-size: 12px;
+  line-height: 1.4;
+  height: calc(12px * 1.4 * 3 + 8px);
+  overflow: hidden;
+  color: #bbb;
+}
+#log div:last-child { color: #fff; }
+
+#panel {
+  padding: 4px 10px;
+  background: #1c1f24;
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: calc(13px * 1.5 * 2 + 8px);
+}
+#panel .heroes { display: flex; gap: 12px; color: #aaa; }
+#panel .down { color: #e66; }
+#panel .name { font-weight: bold; }
+#panel .enemy { color: #f88; }
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px;
+}
+#actions { min-height: calc(44px + 8px); }
+#controls { padding-bottom: 8px; }
+
+button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px 6px;
+  border: 1px solid #444;
+  border-radius: 6px;
+  background: #2b3038;
+  color: #eee;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button:disabled { opacity: 0.35; cursor: default; }
+button.hot { background: #c9a227; color: #111; border-color: #c9a227; font-weight: bold; }
+button small { display: block; font-size: 11px; opacity: 0.8; }

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>どちらかが辿り着けばいい</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <span id="tb-floor"></span>
+      <span id="tb-turn"></span>
+      <span id="tb-best"></span>
+      <span id="tb-seed"></span>
+    </header>
+    <main id="map-wrap">
+      <canvas id="map"></canvas>
+      <div id="overlay" hidden></div>
+    </main>
+    <section id="log"></section>
+    <section id="panel"></section>
+    <nav id="actions"></nav>
+    <nav id="controls">
+      <button type="button" data-action="next">次のユニット</button>
+      <button type="button" data-action="end">ターン終了</button>
+      <button type="button" data-action="overview">全体マップ</button>
+    </nav>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
