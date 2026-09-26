@@ -106,6 +106,9 @@ export function createInput({ canvas, renderer, getState, refresh, restart }) {
       case 'attack':
         state.ui = { ...state.ui, mode: 'attack', reachable: null, targets: G.getAttackTargets(state, id) };
         break;
+      case 'descend':
+        G.descend(state, id);
+        break;
       case 'wait':
         G.wait(state, id);
         break;
@@ -133,6 +136,7 @@ export function actionButtons(state) {
   }
   const list = [];
   if (u.canAttack && G.getAttackTargets(state, u.id).length) list.push({ action: 'attack', label: '攻撃' });
+  if (G.canDescend(state, u.id)) list.push({ action: 'descend', label: '降りる' });
   list.push({ action: 'wait', label: '待機' });
   if (u.moved) list.push({ action: 'undo', label: '戻す' });
   return list;

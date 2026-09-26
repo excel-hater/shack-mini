@@ -39,7 +39,7 @@ export function renderHud(state, buttons) {
 }
 
 function heroSummary(h) {
-  if (h.down) return `<span class="down">${h.name}：退場中（次の階層で復活）</span>`;
+  if (h.down) return `<span class="down">${h.name} 退場中（次の階層で復活）</span>`;
   return `<span>${h.name} Lv${h.lv} HP${h.hp}/${h.maxHp} MP${h.mp}/${h.maxMp}</span>`;
 }
 

@@ -282,3 +282,32 @@ export function attack(state, id, targetId) {
   afterAction(state);
   return true;
 }
+
+// ---------- 階段 ----------
+
+export function canDescend(state, id) {
+  const u = isOwnActive(state, id);
+  if (!u || u.acted || !isHero(u)) return false;
+  return state.map.tiles[idx(state.map, u.x, u.y)] === TILE.STAIRS;
+}
+
+// どちらかが降りれば、もう1人も位置に関係なく一緒に次の階層へ
+export function descend(state, id) {
+  if (!canDescend(state, id)) return false;
+  const who = getUnit(state, id);
+  state.floor++;
+  state.best = Math.max(state.best, state.floor);
+  addLog(state, `${who.name}が階段を降りた。${state.floor}階へ`);
+  for (const h of heroes(state)) {
+    if (h.down) {
+      h.down = false;
+      h.hp = CONFIG.reviveHp;
+      addLog(state, `${h.name}がHP${h.hp}で復活した`);
+    }
+    h.mp = Math.min(h.maxMp, h.mp + Math.ceil(h.maxMp * CONFIG.mp.onDescendRatio));
+  }
+  // 召喚ユニットと敵は消える
+  state.units = heroes(state);
+  setupFloor(state);
+  return true;
+}

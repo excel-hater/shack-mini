@@ -77,7 +77,8 @@ html, body {
   line-height: 1.5;
   min-height: calc(13px * 1.5 * 2 + 8px);
 }
-#panel .heroes { display: flex; gap: 12px; color: #aaa; }
+#panel .heroes { display: flex; flex-wrap: wrap; gap: 0 12px; color: #aaa; }
+#panel .heroes span { white-space: nowrap; }
 #panel .down { color: #e66; }
 #panel .name { font-weight: bold; }
 #panel .enemy { color: #f88; }

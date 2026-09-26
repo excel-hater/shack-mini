@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CONFIG } from '../src/config.js';
 import { chooseTarget, runEnemyPhase } from '../src/logic/ai.js';
-import { attack, endPlayerPhase, getAttackTargets, heroes, newGame } from '../src/logic/game.js';
+import { attack, canDescend, descend, endPlayerPhase, getAttackTargets, heroes, newGame } from '../src/logic/game.js';
 import { computeVisibility } from '../src/logic/vision.js';
 import { addEnemy, addHero, stateFrom } from './helpers.js';
 
@@ -105,4 +105,55 @@ test('階層開始時の敵はA・Bの部屋にいない', () => {
     assert.equal(enemies.length, CONFIG.spawn.base);
     for (const e of enemies) assert.ok(!heroRooms.includes(s.map.roomIdAt[e.y * w + e.x]), `seed ${seed}`);
   }
+});
+
+// 選んだヒーローを階段の上に置く（敵は取り除く）
+function onStairs(s, hero) {
+  s.units = s.units.filter((u) => u.side !== 'enemy');
+  hero.x = s.map.stairs.x;
+  hero.y = s.map.stairs.y;
+  computeVisibility(s);
+}
+
+test('片方が退場した状態で降りると、次の階層でHP1で復活し、その部屋に敵がいない', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const s = newGame(seed);
+    const [A, B] = heroes(s);
+    B.down = true;
+    B.hp = 0;
+    onStairs(s, A);
+    const hpA = A.hp;
+    assert.equal(descend(s, A.id), true);
+    assert.equal(s.floor, 2);
+    assert.equal(s.best, 2);
+    assert.equal(B.down, false);
+    assert.equal(B.hp, CONFIG.reviveHp);
+    assert.equal(A.hp, hpA, 'HPはそのまま持ち越し');
+    const w = s.map.w;
+    const roomB = s.map.roomIdAt[B.y * w + B.x];
+    assert.ok(roomB >= 0);
+    assert.ok(!s.units.some((u) => u.side === 'enemy' && s.map.roomIdAt[u.y * w + u.x] === roomB), `seed ${seed}`);
+    assert.equal(s.floorTurn, 1);
+    assert.equal(s.units.filter((u) => u.side === 'enemy').length, CONFIG.spawn.base);
+  }
+});
+
+test('降りるとMPが最大の50%（切り上げ）回復し、Lv・EXPは持ち越す', () => {
+  const s = newGame(5);
+  const [A, B] = heroes(s);
+  B.mp = 1;
+  B.exp = 7;
+  onStairs(s, B);
+  descend(s, B.id);
+  assert.equal(B.mp, Math.min(B.maxMp, 1 + Math.ceil(B.maxMp * CONFIG.mp.onDescendRatio)));
+  assert.equal(B.exp, 7);
+  assert.equal(A.mp, A.maxMp);
+});
+
+test('階段の上にいないと降りられない', () => {
+  const s = newGame(5);
+  const [A] = heroes(s);
+  assert.equal(canDescend(s, A.id), false);
+  assert.equal(descend(s, A.id), false);
+  assert.equal(s.floor, 1);
 });

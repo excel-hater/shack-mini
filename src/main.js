@@ -84,3 +84,8 @@ new ResizeObserver(() => {
 }).observe(canvas);
 renderer.resize();
 refresh();
+
+// 開発用：?debug を付けると、コンソールから state を触れる
+if (new URLSearchParams(location.search).has('debug')) {
+  window.dslg = { get state() { return state; }, renderer, input, refresh };
+}
