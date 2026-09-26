@@ -4,7 +4,7 @@
 import { CONFIG } from '../config.js';
 import * as G from '../logic/game.js';
 
-export function createInput({ canvas, renderer, getState, refresh, restart }) {
+export function createInput({ canvas, renderer, getState, getSettings, refresh, restart }) {
   let down = null; // { x, y, lastX, lastY, dragging }
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -50,6 +50,17 @@ export function createInput({ canvas, renderer, getState, refresh, restart }) {
     const ui = state.ui;
     const sel = G.getUnit(state, state.selectedId);
 
+    // 直接タップ：赤い敵・水色の味方をタップするだけで攻撃・回復
+    if (ui.quick && sel) {
+      const t = has(ui.targets, p.x, p.y);
+      if (t) {
+        if (t.kind === 'attack') G.attack(state, sel.id, t.id);
+        else G.heal(state, sel.id, t.id);
+        afterOperation();
+        return;
+      }
+    }
+
     // 攻撃・召喚・回復の対象選び。対象以外をタップしたら取り消し
     if (ui.mode === 'attack' || ui.mode === 'summon' || ui.mode === 'heal') {
       const t = has(ui.targets, p.x, p.y);
@@ -57,7 +68,7 @@ export function createInput({ canvas, renderer, getState, refresh, restart }) {
       else if (t && ui.mode === 'summon') G.summon(state, sel.id, ui.summonKind, t.x, t.y);
       else if (t && ui.mode === 'heal') G.heal(state, sel.id, t.id);
       else G.selectUnit(state, sel.id);
-      refresh();
+      afterOperation();
       return;
     }
 
@@ -71,7 +82,7 @@ export function createInput({ canvas, renderer, getState, refresh, restart }) {
       }
       if (has(ui.reachable, p.x, p.y)) {
         G.moveUnit(state, sel.id, p.x, p.y);
-        refresh();
+        afterOperation();
         return;
       }
     }
@@ -86,7 +97,35 @@ export function createInput({ canvas, renderer, getState, refresh, restart }) {
     } else {
       ui.inspectId = null;
     }
+    afterOperation();
+  }
+
+  // 操作のあと：全員が行動済みなら自動でターン終了（設定ON時）
+  function afterOperation() {
+    const state = getState();
+    if (getSettings().autoEndTurn && state.phase === 'player' && G.allActed(state)) {
+      G.endPlayerPhase(state);
+    }
     refresh();
+  }
+
+  // 移動前・行動選択中は、今の位置から攻撃・回復できる相手を最初から表示する（直接タップ）。
+  // 描画の前に毎回呼ぶ
+  function syncQuickTargets() {
+    const state = getState();
+    const ui = state.ui;
+    const base = ui.mode === 'move' || ui.mode === 'action';
+    if (base && getSettings().tapToAct && state.phase === 'player' && state.selectedId != null) {
+      const id = state.selectedId;
+      ui.targets = [
+        ...G.getAttackTargets(state, id).map((t) => ({ ...t, kind: 'attack' })),
+        ...G.getHealTargets(state, id).map((t) => ({ ...t, kind: 'heal' })),
+      ];
+      ui.quick = true;
+    } else if (ui.quick) {
+      if (base) ui.targets = null;
+      ui.quick = false;
+    }
   }
 
   function handleAction(action, arg) {
@@ -134,10 +173,10 @@ export function createInput({ canvas, renderer, getState, refresh, restart }) {
         G.selectUnit(state, id);
         break;
     }
-    refresh();
+    afterOperation();
   }
 
-  return { handleAction };
+  return { handleAction, syncQuickTargets };
 }
 
 // 選択中のユニットに応じた行動ボタン

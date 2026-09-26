@@ -52,6 +52,7 @@ function refresh() {
     if (sel) renderer.centerOn(sel.x, sel.y);
   }
   if (state.best > loadBest()) saveBest(state.best);
+  input.syncQuickTargets();
   renderer.draw(state);
   renderHud(state, actionButtons(state), settings);
 }
