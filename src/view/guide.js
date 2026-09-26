@@ -7,8 +7,11 @@ const badge = (u) => ({ text: unitMark(u), color: unitColor(u) });
 
 // playing：演出中ならその見出し（例「敵のターン」）。戻り値 { who, text, tone } または null
 export function guideText(state, settings, playing = null) {
+  if (playing) {
+    const tone = playing.includes('敵') ? 'enemy' : 'info';
+    return { who: null, text: `${playing}（タップで早送り）`, tone };
+  }
   if (state.phase === 'gameover') return null;
-  if (playing) return { who: null, text: `${playing}（タップで早送り）`, tone: 'enemy' };
 
   const inspect = state.ui.inspectId != null ? G.getUnit(state, state.ui.inspectId) : null;
   if (inspect && !inspect.down) {

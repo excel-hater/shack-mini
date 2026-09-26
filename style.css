@@ -12,6 +12,7 @@ html, body {
 }
 
 #app {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -140,15 +141,50 @@ html, body {
 #overlay button { flex: none; min-width: 160px; }
 
 #log {
-  padding: 4px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 1px;
+  padding: 3px 8px;
   background: #16181c;
   font-size: 12px;
-  line-height: 1.4;
-  height: calc(12px * 1.4 * 3 + 8px);
+  line-height: 1.35;
+  height: calc(12px * 1.35 * 4 + 12px);
   overflow: hidden;
-  color: #bbb;
+  color: #9ca3af;
+  cursor: pointer;
 }
-#log div:last-child { color: #fff; }
+#log.expanded {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  height: auto;
+  max-height: 70%;
+  justify-content: flex-start;
+  overflow-y: auto;
+  border-top: 2px solid #444;
+  padding-bottom: 8px;
+}
+#log .entry { padding: 0 4px; border-left: 3px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#log .entry:last-child { color: #fff; }
+#log .entry.enemy { border-left-color: #ef4444; background: rgba(185, 28, 28, 0.28); color: #fecaca; }
+#log .entry.enemy:last-child { color: #fff; }
+#log .entry.ally { border-left-color: #3b82f6; color: #cbd5e1; }
+#log .who {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #fff;
+  vertical-align: 1px;
+}
+#log .enemy .who { background: #dc2626; }
+#log .ally .who { background: #2563eb; }
+#log .sep { color: #6b7280; font-size: 10px; text-align: center; }
 
 #panel {
   min-height: 107px;

@@ -3,7 +3,8 @@ import { randomSeed } from './logic/rng.js';
 import { getUnit, newGame, setOptions } from './logic/game.js';
 import { createRenderer } from './view/render.js';
 import { actionButtons, createInput } from './view/input.js';
-import { renderHud } from './view/hud.js';
+import { renderHud, toggleLog } from './view/hud.js';
+import { createFx } from './view/fx.js';
 import { loadSettings, saveSettings, settingsHtml } from './view/settings.js';
 
 function readSeed() {
@@ -53,9 +54,25 @@ function refresh() {
   }
   if (state.best > loadBest()) saveBest(state.best);
   input.syncQuickTargets();
-  renderer.draw(state);
-  renderHud(state, actionButtons(state), settings);
+  const busy = fx.isBusy();
+  renderer.draw(state, fx.frame());
+  renderHud(state, busy ? [] : actionButtons(state), settings, fx.label());
+  // 新しく起きた出来事を演出に回す（描いた後に積むので、カメラ移動は演出側が決める）
+  const events = state.events.splice(0);
+  if (events.length) fx.enqueue(events);
 }
+
+const fx = createFx({
+  renderer,
+  redraw: () => renderer.draw(state, fx.frame()),
+  refresh: () => refresh(),
+  onFinish: () => {
+    // 演出が終わったら、選択中のユニットへカメラを戻す
+    const sel = getUnit(state, state.selectedId);
+    if (sel) renderer.centerOn(sel.x, sel.y);
+    refresh();
+  },
+});
 
 function restart() {
   const seed = randomSeed();
@@ -67,10 +84,22 @@ function restart() {
     // URL を書き換えられなくても続行する
   }
   start(seed);
-  refresh();
+  fx.skip();
 }
 
-const input = createInput({ canvas, renderer, getState: () => state, getSettings: () => settings, refresh, restart });
+const input = createInput({
+  canvas, renderer, refresh, restart,
+  getState: () => state,
+  getSettings: () => settings,
+  isBusy: () => fx.isBusy(),
+  skipFx: () => fx.skip(),
+});
+
+// ログ欄のタップで、直近20件まで広げる／戻す
+document.getElementById('log').addEventListener('click', () => {
+  toggleLog();
+  refresh();
+});
 
 // 設定ダイアログ
 const settingsEl = document.getElementById('settings');

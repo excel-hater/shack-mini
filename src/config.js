@@ -38,7 +38,9 @@ export const CONFIG = {
     healer:  { name: '癒し手', mp: 4, make: (L) => ({ hp: 8 + 2*L, atk: 0, def: 1, mov: 3, range: [1, 1], canAttack: false, heal: 4 + 2*L }) },
   },
   healRange: 1,
-  log: { keep: 20, show: 3 },
+  log: { keep: 20, show: 4 },
+  // 演出の長さ（ミリ秒）
+  fx: { enemyAttack: 650, allyAttack: 350, heal: 400, popup: 700, phaseBanner: 450, floorBanner: 900 },
   tileSize: 32,
   dragThreshold: 8,
   storageKey: 'shack-mini.best',

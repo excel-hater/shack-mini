@@ -76,7 +76,15 @@ export function createRenderer(canvas) {
     return { x: Math.floor((px - ox) / s / ts), y: Math.floor((py - oy) / s / ts) };
   }
 
-  function draw(state) {
+  // マスが（端の1マス分の余裕を残して）画面に収まっているか
+  function isOnScreen(p) {
+    if (view.overview) return true;
+    const x = p.x * ts - view.camX;
+    const y = p.y * ts - view.camY;
+    return x >= ts && y >= ts && x + 2 * ts <= view.vw && y + 2 * ts <= view.vh;
+  }
+
+  function draw(state, fx = null) {
     const map = state.map;
     if (view.map !== map) {
       view.map = map;
@@ -89,10 +97,109 @@ export function createRenderer(canvas) {
     ctx.translate(ox, oy);
     ctx.scale(s, s);
     drawTiles(state);
-    drawHighlights(state);
+    // 演出中は移動範囲などを消して、起きていることだけを見せる
+    if (!fx) drawHighlights(state);
     drawUnits(state);
-    drawPredictions(state);
+    if (fx) drawFxWorld(fx);
+    else drawPredictions(state);
     ctx.restore();
+    if (fx) drawFxBanner(fx);
+  }
+
+  // ---------- 演出 ----------
+
+  function arrow(from, to, color) {
+    const x1 = from.x * ts + ts / 2;
+    const y1 = from.y * ts + ts / 2;
+    const x2 = to.x * ts + ts / 2;
+    const y2 = to.y * ts + ts / 2;
+    const ang = Math.atan2(y2 - y1, x2 - x1);
+    const len = Math.hypot(x2 - x1, y2 - y1) - ts * 0.4;
+    if (len <= 0) return;
+    const ex = x1 + Math.cos(ang) * len;
+    const ey = y1 + Math.sin(ang) * len;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(ex + Math.cos(ang) * 8, ey + Math.sin(ang) * 8);
+    ctx.lineTo(ex + Math.cos(ang + 2.4) * 10, ey + Math.sin(ang + 2.4) * 10);
+    ctx.lineTo(ex + Math.cos(ang - 2.4) * 10, ey + Math.sin(ang - 2.4) * 10);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 浮き上がる文字
+  function popup(at, text, color, p) {
+    const x = at.x * ts + ts / 2;
+    const y = at.y * ts + ts / 2 - 6 - p * 18;
+    ctx.globalAlpha = p < 0.7 ? 1 : (1 - p) / 0.3;
+    ctx.font = `bold ${ts * 0.62}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000';
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+    ctx.globalAlpha = 1;
+  }
+
+  function flash(at, color, p) {
+    ctx.globalAlpha = 0.25 + 0.45 * Math.abs(Math.sin(p * Math.PI * 3));
+    ctx.fillStyle = color;
+    ctx.fillRect(at.x * ts, at.y * ts, ts, ts);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawFxWorld({ ev, p }) {
+    switch (ev.type) {
+      case 'attack': {
+        const enemy = ev.side === 'enemy';
+        flash(ev.to, enemy ? '#ff2020' : '#ffd23f', p);
+        arrow(ev.from, ev.to, enemy ? '#ff4040' : '#ffd23f');
+        popup(ev.to, ev.defeated ? `-${ev.damage} 撃破` : `-${ev.damage}`, enemy ? '#ff6b6b' : '#ffec6b', p);
+        break;
+      }
+      case 'heal':
+        flash(ev.to, '#50dcff', p);
+        popup(ev.to, `+${ev.amount}`, '#7ee8ff', p);
+        break;
+      case 'levelup':
+        popup(ev.at, `Lv${ev.lv} UP!`, '#ffd23f', p);
+        break;
+      case 'down':
+        flash(ev.at, '#ff2020', p);
+        popup(ev.at, `${ev.name} 退場`, '#ff6b6b', p);
+        break;
+    }
+  }
+
+  // 画面中央の帯（敵のターン／味方の番／階層）
+  function drawFxBanner({ ev }) {
+    const text = {
+      enemyPhase: '敵のターン',
+      playerPhase: `ターン${ev.turn}　味方の番`,
+      floor: `${ev.floor}階`,
+    }[ev.type];
+    if (!text) return;
+    const color = { enemyPhase: '#b91c1c', playerPhase: '#1d4ed8', floor: '#a16207' }[ev.type];
+    const h = 56;
+    const y = view.vh / 2 - h / 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(0, y - 4, view.vw, h + 8);
+    ctx.fillStyle = color;
+    ctx.fillRect(0, y, view.vw, h);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 26px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, view.vw / 2, y + h / 2 + 1);
   }
 
   // visible / seen がまだ無い（霧なし）ときは全体を見えている扱いにする
@@ -264,5 +371,5 @@ export function createRenderer(canvas) {
     }
   }
 
-  return { view, resize, draw, centerOn, panBy, screenToTile };
+  return { view, resize, draw, centerOn, panBy, screenToTile, isOnScreen };
 }

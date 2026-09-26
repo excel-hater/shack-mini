@@ -4,7 +4,7 @@
 import { CONFIG } from '../config.js';
 import * as G from '../logic/game.js';
 
-export function createInput({ canvas, renderer, getState, getSettings, refresh, restart }) {
+export function createInput({ canvas, renderer, getState, getSettings, isBusy, skipFx, refresh, restart }) {
   let down = null; // { x, y, lastX, lastY, dragging }
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -38,6 +38,11 @@ export function createInput({ canvas, renderer, getState, getSettings, refresh, 
 
   function tap(p) {
     const state = getState();
+    // 演出中のタップは早送り
+    if (isBusy()) {
+      skipFx();
+      return;
+    }
     // 全体マップ中のタップは、その地点へカメラを移して通常表示に戻すだけ
     if (renderer.view.overview) {
       renderer.view.overview = false;
@@ -130,6 +135,10 @@ export function createInput({ canvas, renderer, getState, getSettings, refresh, 
 
   function handleAction(action, arg) {
     const state = getState();
+    if (isBusy() && action !== 'restart') {
+      skipFx();
+      return;
+    }
     const id = state.selectedId;
     switch (action) {
       case 'overview':

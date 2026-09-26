@@ -21,7 +21,8 @@ export function renderHud(state, buttons, settings, playing = null) {
   phase.className = enemyTurn ? 'enemy' : 'ally';
   phase.hidden = state.phase === 'gameover';
 
-  $('log').innerHTML = state.log.slice(-CONFIG.log.show).map((m) => `<div>${esc(m.text)}</div>`).join('');
+  $('log').innerHTML = logHtml(state.log);
+  $('log').classList.toggle('expanded', logExpanded);
   $('panel').innerHTML = panelHtml(state);
 
   const g = guideText(state, settings, playing);
@@ -44,7 +45,8 @@ export function renderHud(state, buttons, settings, playing = null) {
   document.querySelector('#controls [data-action="next"]').disabled = !myTurn || allActed(state);
 
   const overlay = $('overlay');
-  if (state.phase === 'gameover') {
+  // 全滅の演出を見せ終わってからゲームオーバー画面を出す
+  if (state.phase === 'gameover' && !playing) {
     overlay.innerHTML = `
       <div class="title">shack-mini</div>
       <div class="big">${state.floor}階で全滅</div>
@@ -54,6 +56,29 @@ export function renderHud(state, buttons, settings, playing = null) {
   } else {
     overlay.hidden = true;
   }
+}
+
+let logExpanded = false;
+
+export function toggleLog() {
+  logExpanded = !logExpanded;
+}
+
+const LOG_TAG = { ally: '味方', enemy: '敵' };
+
+// 敵の行動は赤く、味方の行動は青いタグ付きで。ターンが変わるところに区切りを入れる
+function logHtml(log) {
+  const list = logExpanded ? log : log.slice(-CONFIG.log.show);
+  let prev = null;
+  const out = [];
+  for (const m of list) {
+    const key = `${m.floor}-${m.turn}`;
+    if (prev !== null && key !== prev) out.push(`<div class="sep">— ${m.floor}階 ターン${m.turn} —</div>`);
+    prev = key;
+    const tag = LOG_TAG[m.side] ? `<span class="who">${LOG_TAG[m.side]}</span>` : '';
+    out.push(`<div class="entry ${m.side}">${tag}${esc(m.text)}</div>`);
+  }
+  return out.join('');
 }
 
 const pct = (v, max) => `${Math.max(0, Math.min(100, (v / Math.max(1, max)) * 100))}%`;
