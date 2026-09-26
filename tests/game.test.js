@@ -8,6 +8,7 @@ import {
 } from '../src/logic/game.js';
 import { knockOut } from '../src/logic/combat.js';
 import { computeVisibility } from '../src/logic/vision.js';
+import { distanceField } from '../src/logic/path.js';
 import { addEnemy, addHero, addSummon, stateFrom } from './helpers.js';
 
 const OPEN = [
@@ -241,4 +242,96 @@ test('癒し手は隣接する味方を回復できる（自分は対象外）',
   assert.deepEqual(getHealTargets(s, h.id).map((t) => t.id), [a.id]);
   assert.equal(heal(s, h.id, a.id), true);
   assert.equal(a.hp, 5 + h.heal);
+});
+
+// 敵をすべて取り除き、A・Bを部屋に置いたまま指定ターンの直前まで進める
+function advanceTo(s, turn) {
+  while (s.floorTurn < turn - 1) {
+    s.units = s.units.filter((u) => u.side !== 'enemy');
+    endPlayerPhase(s);
+  }
+  s.units = s.units.filter((u) => u.side !== 'enemy');
+}
+
+test('8ターン目に、見えていない部屋へ増援が出る', () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const s = newGame(seed);
+    advanceTo(s, CONFIG.spawn.reinforceEvery);
+    endPlayerPhase(s);
+    assert.equal(s.floorTurn, CONFIG.spawn.reinforceEvery);
+    const enemies = s.units.filter((u) => u.side === 'enemy');
+    assert.ok(enemies.length >= CONFIG.spawn.reinforceCount[0] && enemies.length <= CONFIG.spawn.reinforceCount[1], `seed ${seed}: ${enemies.length}`);
+    const room = s.map.roomIdAt[enemies[0].y * s.map.w + enemies[0].x];
+    assert.ok(room >= 0);
+    for (const e of enemies) {
+      assert.equal(s.map.roomIdAt[e.y * s.map.w + e.x], room, '同じ部屋に出る');
+      assert.equal(s.visible[e.y * s.map.w + e.x], 0, '見えていない場所に出る');
+    }
+  }
+});
+
+test('7ターン目には増援が出ない', () => {
+  const s = newGame(4);
+  advanceTo(s, 7);
+  endPlayerPhase(s);
+  assert.equal(s.units.filter((u) => u.side === 'enemy').length, 0);
+});
+
+test('40ターン目に徘徊者が出て、経路距離が近い方のA・Bを追う', () => {
+  const s = newGame(9);
+  advanceTo(s, CONFIG.spawn.wandererTurn);
+  endPlayerPhase(s);
+  const wd = s.units.find((u) => u.kind === 'wanderer');
+  assert.ok(wd, '徘徊者が出る');
+  assert.equal(s.wandererSpawned, true);
+  assert.ok(s.log.includes('何かの気配がする…'));
+  const [A, B] = heroes(s);
+  const dA = distanceField(s.map, wd)[A.y * s.map.w + A.x];
+  const dB = distanceField(s.map, wd)[B.y * s.map.w + B.x];
+  const near = dA <= dB ? A : B;
+  assert.equal(chooseTarget(s, wd), near);
+  // 敵フェイズで近づく
+  const before = dA <= dB ? dA : dB;
+  s.units = s.units.filter((u) => u.side !== 'enemy' || u === wd);
+  endPlayerPhase(s);
+  const after = distanceField(s.map, wd)[near.y * s.map.w + near.x];
+  assert.ok(after < before, `${before} → ${after}`);
+});
+
+test('徘徊者は同じ部屋でも経路距離8以内でもない相手を追う（候補条件を無視）', () => {
+  const s = stateFrom([
+    '######################',
+    '#....................#',
+    '######################',
+  ], [{ x: 1, y: 1, w: 2, h: 1 }, { x: 19, y: 1, w: 2, h: 1 }]);
+  const a = addHero(s, 'A', 1, 1);
+  addHero(s, 'B', 2, 1);
+  const wd = addEnemy(s, 'wanderer', 20, 1);
+  const g = addEnemy(s, 'goblin', 19, 1);
+  assert.equal(chooseTarget(s, g), null);
+  assert.equal(chooseTarget(s, wd).kind, 'B');
+  assert.ok(a);
+});
+
+test('弓ゴブリンは3階から出る。敵Lvは階層に沿って上がる', () => {
+  assert.equal(CONFIG.enemyLevel(1), 1);
+  assert.equal(CONFIG.enemyLevel(5), 6);
+  assert.equal(CONFIG.enemyLevel(10), 12);
+  assert.equal(CONFIG.enemyLevel(11), 12);
+  let archers = 0;
+  for (let seed = 1; seed <= 30; seed++) {
+    const s = newGame(seed);
+    assert.ok(!s.units.some((u) => u.kind === 'archer'), '1階には出ない');
+    for (let f = 1; f < CONFIG.archerFromFloor; f++) {
+      const [A] = heroes(s);
+      A.x = s.map.stairs.x;
+      A.y = s.map.stairs.y;
+      s.units = s.units.filter((u) => u.side !== 'enemy' || !(u.x === A.x && u.y === A.y));
+      descend(s, A.id);
+    }
+    assert.equal(s.floor, CONFIG.archerFromFloor);
+    archers += s.units.filter((u) => u.kind === 'archer').length;
+    for (const e of s.units.filter((u) => u.side === 'enemy')) assert.equal(e.lv, CONFIG.enemyLevel(s.floor));
+  }
+  assert.ok(archers > 0, '3階では弓ゴブリンが混ざる');
 });

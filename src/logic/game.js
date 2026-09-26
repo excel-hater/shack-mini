@@ -93,7 +93,7 @@ function setupFloor(state) {
 
   // 敵：A・Bの部屋以外の部屋に置く
   const count = CONFIG.spawn.base + Math.floor(state.floor / CONFIG.spawn.perFloors);
-  for (let k = 0; k < count; k++) spawnEnemy(state, rng.pick(others), 'goblin');
+  for (let k = 0; k < count; k++) spawnEnemy(state, rng.pick(others), randomEnemyKind(state));
 
   state.floorTurn = 1;
   state.wandererSpawned = false;
@@ -116,6 +116,11 @@ function placeInRoom(state, unit, room) {
   const t = emptyTileInRoom(state, room);
   unit.x = t.x;
   unit.y = t.y;
+}
+
+// 弓ゴブリンは archerFromFloor 階から、archerChance の確率で混ざる
+function randomEnemyKind(state) {
+  return state.floor >= CONFIG.archerFromFloor && state.rng.chance(CONFIG.archerChance) ? 'archer' : 'goblin';
 }
 
 function spawnEnemy(state, room, kind) {
@@ -153,6 +158,8 @@ export function endPlayerPhase(state) {
     return true;
   }
   state.floorTurn++;
+  computeVisibility(state);
+  spawnReinforcements(state);
   if (state.floorTurn % CONFIG.regen.everyTurns === 0) {
     for (const h of heroes(state)) {
       if (!h.down) h.hp = Math.min(h.maxHp, h.hp + Math.ceil(h.maxHp * CONFIG.regen.ratio));
@@ -160,6 +167,34 @@ export function endPlayerPhase(state) {
   }
   startPlayerPhase(state);
   return true;
+}
+
+// 見えているマスを1つも含まない部屋
+function hiddenRooms(state) {
+  return state.map.rooms.filter((r) => roomTiles(r).every((t) => !state.visible[idx(state.map, t.x, t.y)]));
+}
+
+// 増援（reinforceEvery ターンごと）と徘徊者（wandererTurn ターン目）
+function spawnReinforcements(state) {
+  const { rng } = state;
+  const sp = CONFIG.spawn;
+  if (state.floorTurn % sp.reinforceEvery === 0) {
+    const rooms = hiddenRooms(state);
+    if (rooms.length) {
+      const room = rng.pick(rooms);
+      const n = rng.int(sp.reinforceCount[0], sp.reinforceCount[1]);
+      for (let k = 0; k < n; k++) spawnEnemy(state, room, randomEnemyKind(state));
+      addLog(state, 'どこかで敵の増援が現れた');
+    }
+  }
+  // TODO(仕様): 見えていない部屋がないときは、次のターン以降に持ち越す
+  if (state.floorTurn >= sp.wandererTurn && !state.wandererSpawned) {
+    const rooms = hiddenRooms(state);
+    if (rooms.length && spawnEnemy(state, rng.pick(rooms), 'wanderer')) {
+      state.wandererSpawned = true;
+      addLog(state, '何かの気配がする…');
+    }
+  }
 }
 
 // ---------- 選択 ----------
