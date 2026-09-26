@@ -29,6 +29,7 @@ export function renderHud(state, buttons) {
   const overlay = $('overlay');
   if (state.phase === 'gameover') {
     overlay.innerHTML = `
+      <div class="title">shack-mini</div>
       <div class="big">${state.floor}階で全滅</div>
       <div>ベスト ${state.best}階</div>
       <button type="button" data-action="restart">もう一度</button>`;

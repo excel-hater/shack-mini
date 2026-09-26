@@ -29,6 +29,7 @@ html, body {
   background: #1c1f24;
   font-size: 13px;
 }
+#tb-title { font-weight: bold; color: #ffd23f; letter-spacing: 0.02em; }
 #tb-seed { margin-left: auto; color: #888; }
 
 #map-wrap {
@@ -56,6 +57,7 @@ html, body {
   text-align: center;
 }
 #overlay[hidden] { display: none; }
+#overlay .title { color: #ffd23f; font-weight: bold; }
 #overlay .big { font-size: 28px; font-weight: bold; }
 #overlay button { flex: none; min-width: 160px; }
 

@@ -41,5 +41,5 @@ export const CONFIG = {
   log: { keep: 20, show: 3 },
   tileSize: 32,
   dragThreshold: 8,
-  storageKey: 'dungeon-slg-1.best',
+  storageKey: 'shack-mini.best',
 };
