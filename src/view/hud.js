@@ -70,7 +70,7 @@ const LOG_TAG = { ally: '味方', enemy: '敵' };
 function logHtml(log) {
   const list = logExpanded ? log : log.slice(-CONFIG.log.show);
   let prev = null;
-  const out = [];
+  const out = logExpanded ? ['<div class="log-head">ログ（直近20件・タップで閉じる）</div>'] : [];
   for (const m of list) {
     const key = `${m.floor}-${m.turn}`;
     if (prev !== null && key !== prev) out.push(`<div class="sep">— ${m.floor}階 ターン${m.turn} —</div>`);
