@@ -151,17 +151,88 @@ html, body {
 #log div:last-child { color: #fff; }
 
 #panel {
-  padding: 4px 10px;
+  min-height: 107px;
+  padding: 6px 8px 4px;
   background: #1c1f24;
   font-size: 13px;
   line-height: 1.5;
-  min-height: calc(13px * 1.5 * 2 + 8px);
 }
-#panel .heroes { display: flex; flex-wrap: wrap; gap: 0 12px; color: #aaa; }
-#panel .heroes span { white-space: nowrap; }
-#panel .down { color: #e66; }
+#panel .heroes { display: flex; gap: 6px; margin-bottom: 4px; }
+#panel .chip {
+  flex: 1 1 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  min-height: 44px;
+  padding: 4px 6px;
+  text-align: left;
+  font-size: 12px;
+  border: 2px solid #3a404a;
+  background: #262b33;
+}
+#panel .chip.ready { border-color: #3b7dff; }
+#panel .chip.done { opacity: 0.6; }
+#panel .chip.down { border-color: #7f1d1d; background: #2a1618; opacity: 1; color: #f87171; }
+#panel .chip:disabled { text-decoration: none; }
+#panel .chip.selected { border-color: #ffd23f; box-shadow: 0 0 0 1px #ffd23f inset; }
+#panel .chip .badge, #panel .detail .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3b7dff;
+  color: #fff;
+  font-weight: bold;
+  font-size: 12px;
+  vertical-align: middle;
+}
+#panel .chip.done .badge, #panel .chip.down .badge { background: #5b6270; }
+#panel .chip .lv { font-weight: bold; }
+#panel .chip .nums { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+#panel .chip .tag { margin-left: auto; }
+#panel .tag {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+}
+#panel .chip.done .tag, #panel .tag.done { background: #4b5563; }
+#panel .chip.down .tag { background: #991b1b; }
+#panel .chip .note { font-size: 11px; }
+#panel .bar {
+  display: inline-block;
+  width: 36px;
+  height: 6px;
+  margin-right: 3px;
+  border-radius: 3px;
+  background: #111;
+  vertical-align: middle;
+  overflow: hidden;
+}
+#panel .bar i { display: block; height: 100%; }
+#panel .bar.hp.hi i { background: #4ade80; }
+#panel .bar.hp.mid i { background: #facc15; }
+#panel .bar.hp.lo i { background: #f87171; }
+#panel .bar.mp i { background: #60a5fa; }
+#panel .detail, #panel .stats { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#panel .muted { color: #888; }
 #panel .name { font-weight: bold; }
-#panel .enemy { color: #f88; }
+#panel .enemy { color: #f87171; font-weight: bold; }
+
+#tb-phase {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: bold;
+}
+#tb-phase.ally { background: #1d4ed8; color: #fff; }
+#tb-phase.enemy { background: #b91c1c; color: #fff; }
+#tb-phase[hidden] { display: none; }
 
 nav {
   display: flex;
@@ -185,6 +256,12 @@ button {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-button:disabled { opacity: 0.35; cursor: default; }
+button:disabled { opacity: 0.35; cursor: default; text-decoration: line-through; }
+#actions .act-attack { background: #b91c1c; border-color: #ef4444; font-weight: bold; }
+#actions .act-summonMenu, #actions .act-summonKind { background: #166534; border-color: #22c55e; }
+#actions .act-heal { background: #0e7490; border-color: #22d3ee; }
+#actions .act-descend { background: #c9a227; border-color: #ffd23f; color: #111; font-weight: bold; }
+#actions .act-wait { background: #3a404a; }
+#actions .act-undo, #actions .act-cancel { background: transparent; border-color: #888; }
 button.hot { background: #c9a227; color: #111; border-color: #c9a227; font-weight: bold; }
 button small { display: block; font-size: 11px; opacity: 0.8; }

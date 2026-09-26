@@ -99,6 +99,9 @@ export function createInput({ canvas, renderer, getState, refresh, restart }) {
       case 'restart':
         restart();
         return;
+      case 'selectHero':
+        G.selectUnit(state, Number(arg));
+        break;
       case 'next':
         G.selectNextUnit(state);
         break;

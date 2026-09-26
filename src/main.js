@@ -94,7 +94,7 @@ settingsEl.addEventListener('click', (e) => {
 });
 document.getElementById('tb-settings').addEventListener('click', openSettings);
 
-for (const el of [document.getElementById('actions'), document.getElementById('controls'), document.getElementById('overlay')]) {
+for (const el of ['actions', 'controls', 'overlay', 'panel'].map((id) => document.getElementById(id))) {
   el.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-action]');
     if (btn && !btn.disabled) input.handleAction(btn.dataset.action, btn.dataset.arg);

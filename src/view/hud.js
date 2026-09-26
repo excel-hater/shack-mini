@@ -3,6 +3,8 @@
 import { CONFIG } from '../config.js';
 import { allActed, getUnit, heroes } from '../logic/game.js';
 import { guideText } from './guide.js';
+import { unitColor, unitMark } from './marks.js';
+import { isHero } from '../logic/units.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -12,6 +14,12 @@ export function renderHud(state, buttons, settings, playing = null) {
   $('tb-floor').textContent = `${state.floor}階`;
   $('tb-turn').textContent = `ターン ${state.floorTurn}`;
   $('tb-best').textContent = `ベスト ${state.best}階`;
+
+  const enemyTurn = state.phase === 'enemy' || (playing && playing.includes('敵'));
+  const phase = $('tb-phase');
+  phase.textContent = enemyTurn ? '敵の番' : '味方の番';
+  phase.className = enemyTurn ? 'enemy' : 'ally';
+  phase.hidden = state.phase === 'gameover';
 
   $('log').innerHTML = state.log.slice(-CONFIG.log.show).map((m) => `<div>${esc(m.text)}</div>`).join('');
   $('panel').innerHTML = panelHtml(state);
@@ -26,7 +34,7 @@ export function renderHud(state, buttons, settings, playing = null) {
   }
 
   $('actions').innerHTML = buttons
-    .map((b) => `<button type="button" data-action="${b.action}"${b.arg ? ` data-arg="${b.arg}"` : ''}${b.disabled ? ' disabled' : ''}>${esc(b.label)}${b.sub ? `<small>${esc(b.sub)}</small>` : ''}</button>`)
+    .map((b) => `<button type="button" class="act-${b.action}" data-action="${b.action}"${b.arg ? ` data-arg="${b.arg}"` : ''}${b.disabled ? ' disabled' : ''}>${esc(b.label)}${b.sub ? `<small>${esc(b.sub)}</small>` : ''}</button>`)
     .join('');
 
   const myTurn = state.phase === 'player' && !playing;
@@ -48,28 +56,52 @@ export function renderHud(state, buttons, settings, playing = null) {
   }
 }
 
-function heroSummary(h) {
-  if (h.down) return `<span class="down">${h.name} 退場中（次の階層で復活）</span>`;
-  return `<span>${h.name} Lv${h.lv} HP${h.hp}/${h.maxHp} MP${h.mp}/${h.maxMp}</span>`;
+const pct = (v, max) => `${Math.max(0, Math.min(100, (v / Math.max(1, max)) * 100))}%`;
+
+function hpClass(u) {
+  const r = u.hp / u.maxHp;
+  return r > 0.5 ? 'hi' : r > 0.25 ? 'mid' : 'lo';
+}
+
+function bar(cls, v, max) {
+  return `<span class="bar ${cls}"><i style="width:${pct(v, max)}"></i></span>`;
+}
+
+// A・B の要約チップ。タップでそのヒーローを選ぶ
+function heroChip(state, h) {
+  const status = h.down ? 'down' : h.acted ? 'done' : 'ready';
+  const tag = { down: '退場中', done: '行動済', ready: '未行動' }[status];
+  const sel = h.id === state.selectedId ? ' selected' : '';
+  const body = h.down
+    ? '<span class="note">次の階層で復活</span>'
+    : `<span class="nums">${bar(`hp ${hpClass(h)}`, h.hp, h.maxHp)}HP${h.hp}/${h.maxHp}</span>`
+      + `<span class="nums">${bar('mp', h.mp, h.maxMp)}MP${h.mp}</span>`;
+  return `<button type="button" class="chip ${status}${sel}" data-action="selectHero" data-arg="${h.id}"${h.down ? ' disabled' : ''}>`
+    + `<span class="badge">${h.name}</span><span class="lv">Lv${h.lv}</span>${body}<span class="tag">${tag}</span></button>`;
 }
 
 function unitDetail(u) {
   const range = u.rangeMin === u.rangeMax ? `${u.rangeMin}` : `${u.rangeMin}〜${u.rangeMax}`;
-  const parts = [
-    `<span class="name${u.side === 'enemy' ? ' enemy' : ''}">${esc(u.name)}</span> Lv${u.lv}`,
-    `HP ${u.hp}/${u.maxHp}`,
+  const enemy = u.side === 'enemy';
+  const head = [
+    `<span class="badge" style="background:${unitColor(u)}">${esc(unitMark(u))}</span>`,
+    `<span class="name${enemy ? ' enemy' : ''}">${esc(u.name)}</span>`,
+    `Lv${u.lv}`,
+    `${bar(`hp ${hpClass(u)}`, u.hp, u.maxHp)}HP ${u.hp}/${u.maxHp}`,
   ];
-  if (u.maxMp > 0) parts.push(`MP ${u.mp}/${u.maxMp}`);
-  if (u.side === 'ally' && (u.kind === 'A' || u.kind === 'B')) parts.push(`EXP ${u.exp}/${CONFIG.expToNext(u.lv)}`);
+  if (u.maxMp > 0) head.push(`MP ${u.mp}/${u.maxMp}`);
+  if (isHero(u)) head.push(`EXP ${u.exp}/${CONFIG.expToNext(u.lv)}`);
   const stats = [`攻${u.atk}`, `防${u.def}`, `移${u.mov}`, `射${range}`];
   if (u.heal) stats.push(`回復${u.heal}`);
-  if (u.side === 'ally') stats.push(u.acted ? '行動済み' : u.moved ? '移動済み' : '');
-  return `<div>${parts.join('　')}</div><div>${stats.filter(Boolean).join(' ')}</div>`;
+  if (enemy) stats.push('<span class="enemy">敵</span>');
+  else if (u.acted) stats.push('<span class="tag done">行動済</span>');
+  else if (u.moved) stats.push('<span class="tag">移動済</span>');
+  return `<div class="detail">${head.join(' ')}</div><div class="stats">${stats.join(' ')}</div>`;
 }
 
 function panelHtml(state) {
-  const summary = `<div class="heroes">${heroes(state).map(heroSummary).join('')}</div>`;
+  const summary = `<div class="heroes">${heroes(state).map((h) => heroChip(state, h)).join('')}</div>`;
   const inspect = state.ui.inspectId != null ? getUnit(state, state.ui.inspectId) : null;
   const u = inspect && !inspect.down ? inspect : getUnit(state, state.selectedId);
-  return summary + (u && !u.down ? unitDetail(u) : '<div>味方をタップして選択</div>');
+  return summary + (u && !u.down ? unitDetail(u) : '<div class="detail muted">ユニットをタップすると詳しく表示</div>');
 }
